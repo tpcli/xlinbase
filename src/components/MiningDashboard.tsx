@@ -11,7 +11,7 @@ export default function MiningDashboard() {
   const [balance, setBalance] = useState(0);
   const [mining, setMining] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [, setLeaderboard] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Fungsi load balance
