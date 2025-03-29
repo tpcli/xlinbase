@@ -1,65 +1,24 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
+
+// Dummy data leaderboard
+const dummyLeaderboard = [
+  { telegram_id: "12345", username: "Alice", balance: 150 },
+  { telegram_id: "67890", username: "Bob", balance: 120 },
+  { telegram_id: "54321", username: "Charlie", balance: 100 },
+];
 
 export default function MiningDashboard() {
   const [user, setUser] = useState<any>(null);
   const [balance, setBalance] = useState(0);
   const [mining, setMining] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
-  const [, setLeaderboard] = useState<any[]>([]);
+  const [leaderboard] = useState(dummyLeaderboard);
   const [error, setError] = useState<string | null>(null);
-
-  // Fungsi load balance
-  const loadBalance = useCallback(async (telegramId: string) => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("balance")
-      .eq("telegram_id", telegramId)
-      .single();
-
-    if (error) {
-      console.error("❌ Error loading balance:", error);
-      setError("Gagal mengambil saldo.");
-    } else {
-      setBalance(data?.balance || 0);
-    }
-  }, []);
-
-  // Fungsi load transaksi
-  const loadHistory = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("❌ Error loading history:", error);
-      setError("Gagal mengambil riwayat transaksi.");
-    } else {
-      setHistory(data);
-    }
-  }, []);
-
-  // Fungsi load leaderboard
-  const loadLeaderboard = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("telegram_id, balance")
-      .order("balance", { ascending: false })
-      .limit(5);
-
-    if (error) {
-      console.error("❌ Error loading leaderboard:", error);
-      setError("Gagal mengambil leaderboard.");
-    } else {
-      setLeaderboard(data);
-    }
-  }, []);
 
   // UseEffect untuk deteksi Telegram WebApp & load data
   useEffect(() => {
@@ -76,15 +35,13 @@ export default function MiningDashboard() {
       }
 
       setUser(tg.initDataUnsafe.user);
-      loadBalance(tg.initDataUnsafe.user.id);
-      loadHistory();
-      loadLeaderboard();
     } else {
       console.error("❌ Telegram WebApp tidak tersedia!");
       setError("Telegram WebApp tidak dapat diakses.");
     }
-  }, [loadBalance, loadHistory, loadLeaderboard]);
+  }, []);
 
+  // Fungsi mulai mining (tanpa backend, hanya update state)
   async function startMining() {
     if (!user?.id) {
       setError("User tidak ditemukan! Silakan login ke Telegram.");
@@ -92,21 +49,13 @@ export default function MiningDashboard() {
     }
 
     setMining(true);
-    setTimeout(async () => {
+    setTimeout(() => {
       const reward = Math.floor(Math.random() * 10) + 1;
       const newBalance = balance + reward;
 
-      const { error } = await supabase
-        .from("users")
-        .upsert([{ telegram_id: user.id, balance: newBalance }]);
+      setBalance(newBalance);
+      setHistory([{ telegram_id: user.id, amount: reward, created_at: new Date() }, ...history]);
 
-      if (error) {
-        console.error("❌ Error saat upsert:", error);
-        setError("Gagal memperbarui saldo.");
-      } else {
-        setBalance(newBalance);
-        setHistory([{ telegram_id: user.id, amount: reward, created_at: new Date() }, ...history]);
-      }
       setMining(false);
     }, 3000);
   }
@@ -114,6 +63,19 @@ export default function MiningDashboard() {
   return (
     <div className="p-6 space-y-6">
       {error && <div className="p-3 bg-red-500 text-white rounded-lg">{error}</div>}
+
+      {/* User Info */}
+      {user && (
+        <Card className="bg-gray-800 text-white shadow-xl">
+          <CardHeader className="flex items-center space-x-4">
+            <img src={user.photo_url} alt="Profile" className="w-12 h-12 rounded-full" />
+            <div>
+              <CardTitle className="text-xl font-bold">{user.first_name} {user.last_name}</CardTitle>
+              <p className="text-sm">@{user.username}</p>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
 
       {/* Balance Card */}
       <Card className="bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-xl">
@@ -131,6 +93,46 @@ export default function MiningDashboard() {
           {mining ? "⛏️ Mining in progress..." : "⚡ Start Mining"}
         </Button>
       </motion.div>
+
+      {/* Mining History */}
+      <Card className="bg-gray-800 text-white shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-lg">Mining History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {history.length === 0 ? (
+            <p className="text-gray-400">Belum ada transaksi</p>
+          ) : (
+            <ul className="space-y-2">
+              {history.map((tx, index) => (
+                <li key={index} className="flex justify-between border-b border-gray-600 pb-1">
+                  <span>⚡ {tx.amount} earned</span>
+                  <span className="text-sm text-gray-400">{new Date(tx.created_at).toLocaleTimeString()}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Leaderboard */}
+      <Card className="bg-gray-800 text-white shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-lg">🏆 Leaderboard</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2">
+            {leaderboard.map((player, index) => (
+              <li key={player.telegram_id} className="flex justify-between border-b border-gray-600 pb-1">
+                <span>
+                  {index + 1}. @{player.username}
+                </span>
+                <span>{player.balance} ⚡</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }
